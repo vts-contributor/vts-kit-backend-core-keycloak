@@ -1,7 +1,8 @@
 package vn.com.viettel.core.utils;
 
 import org.apache.commons.io.FilenameUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
@@ -12,7 +13,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class FileUtils {
-    private static Logger logger = Logger.getLogger(FileUtils.class);
+    private static Logger logger = LoggerFactory.getLogger(FileUtils.class);
 
     public static File saveMultiPartFile(MultipartFile file, String folder) throws IOException {
         File dir = new File(folder);
@@ -34,7 +35,7 @@ public class FileUtils {
             try {
                 file.delete();
             } catch (Exception e) {
-                logger.error(e);
+                logger.error(e.getMessage());
             }
         }
     }

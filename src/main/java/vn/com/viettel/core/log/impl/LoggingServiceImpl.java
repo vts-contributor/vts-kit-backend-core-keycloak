@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MarkerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import vn.com.viettel.core.dto.request.Jwt;
@@ -28,22 +30,30 @@ import java.util.*;
 @Component
 public class LoggingServiceImpl implements LoggingService {
 
-    @Value("${app.code}")
-    String appCode;
+    @Value("${app.code:N/A}")
+    String code;
 
-    @Value("${app.service.code}")
-    String appServiceCode;
+    @Value("${app.service.code:N/A}")
+    String serviceCode;
 
-    @Value("${app.system.code}")
-    String appSystemCode;
+    @Value("${app.system.code:N/A}")
+    String systemCode;
+
+    @Value("${logs.kpi-logs.enabled:true}")
+    Boolean kpiLogEnabled;
 
     private static final String IP_PORT_SERVICE = getIpAddressAndPort_q();
-    private static final Logger LOGGER = Logger.getLogger(LoggingServiceImpl.class);
-    private static final Logger KPI_LOGGER = Logger.getLogger("kpiLogger");
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoggingServiceImpl.class);
+    private static final Logger KPI_LOGGER = LoggerFactory.getLogger("KPI_LOG");
+
     private static final String DATE_FORMAT = "yyyy/MM/dd HH:mm:ss:SSS";
 
     @Override
     public void logRequest(HttpServletRequest httpServletRequest, Object body) {
+        if (!kpiLogEnabled) {
+            return;
+        }
+
         Map<String, String> parameters = buildParametersMap(httpServletRequest);
         long startTime = System.currentTimeMillis();
         httpServletRequest.setAttribute("startDate", new Date());
@@ -60,10 +70,10 @@ public class LoggingServiceImpl implements LoggingService {
         strLogs.append(httpServletRequest.getRequestURI()).append("(").append(httpServletRequest.getMethod()).append(")|");
 
         // Application Code
-        strLogs.append(appCode).append("|");
+        strLogs.append(code).append("|");
 
         // Service Code
-        strLogs.append(appServiceCode).append("|");
+        strLogs.append(serviceCode).append("|");
 
         // Thread ID
         strLogs.append(Thread.currentThread().getId()).append("|");
@@ -98,7 +108,7 @@ public class LoggingServiceImpl implements LoggingService {
                 String json = ow.writeValueAsString(body);
                 strParams += json.replace("\n", "").replace("\r", "").trim().replaceAll(" +", " ");
             } catch (JsonProcessingException ex) {
-                LOGGER.error(ex);
+                LOGGER.error(ex.getMessage());
             }
         }
         String[] arrString = strParams.split("\"");
@@ -175,7 +185,7 @@ public class LoggingServiceImpl implements LoggingService {
         strLogs.append("|");
 
         // System
-        strLogs.append(appSystemCode).append("|");
+        strLogs.append(systemCode).append("|");
 
         // Action Type
         strLogs.append(getActionTypeByMethod(httpServletRequest.getMethod())).append("|");
@@ -192,11 +202,15 @@ public class LoggingServiceImpl implements LoggingService {
         // Data Extended
         strLogs.append("|");
 
-        KPI_LOGGER.info(strLogs);
+        KPI_LOGGER.info(MarkerFactory.getMarker("KPI_LOG"), strLogs.toString());
     }
 
     @Override
     public void logResponse(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object body) {
+        if (!kpiLogEnabled) {
+            return;
+        }
+
         String strResponseHeader = buildHeadersMap(httpServletResponse).toString();
         //thuc hien ghep cac truong theo  chuan logs tap trung
         StringBuilder strLogs = new StringBuilder();
@@ -209,10 +223,10 @@ public class LoggingServiceImpl implements LoggingService {
         strLogs.append(httpServletRequest.getRequestURI()).append("(").append(httpServletRequest.getMethod()).append(")|");
 
         // Application Code
-        strLogs.append(appCode).append("|");
+        strLogs.append(code).append("|");
 
         // Service Code
-        strLogs.append(appServiceCode).append("|");
+        strLogs.append(serviceCode).append("|");
 
         // Thread ID
         strLogs.append(Thread.currentThread().getId()).append("|");
@@ -341,7 +355,7 @@ public class LoggingServiceImpl implements LoggingService {
                 }
                 strLogs.append(dataResponse).append("|");
             } catch (JsonProcessingException ex) {
-                LOGGER.error(ex);
+                LOGGER.error(ex.getMessage());
             }
         }
 
@@ -355,7 +369,7 @@ public class LoggingServiceImpl implements LoggingService {
         strLogs.append("|");
 
         // System
-        strLogs.append(appSystemCode).append("|");
+        strLogs.append(systemCode).append("|");
 
         // Action Type
         strLogs.append(getActionTypeByMethod(httpServletRequest.getMethod())).append("|");
@@ -371,11 +385,10 @@ public class LoggingServiceImpl implements LoggingService {
 
         // Data Extended
         strLogs.append("|");
-        KPI_LOGGER.info(strLogs);
+        KPI_LOGGER.info(MarkerFactory.getMarker("KPI_LOG"), strLogs.toString());
     }
 
     /**
-     *
      * @param httpServletRequest
      * @return
      */
@@ -393,7 +406,6 @@ public class LoggingServiceImpl implements LoggingService {
     }
 
     /**
-     *
      * @param response
      * @return
      */
@@ -409,7 +421,6 @@ public class LoggingServiceImpl implements LoggingService {
     }
 
     /**
-     *
      * @param request
      * @return
      */
@@ -441,23 +452,29 @@ public class LoggingServiceImpl implements LoggingService {
                 strIpServer += ":" + port;
             }
         } catch (MalformedObjectNameException | UnknownHostException ex) {
-            LOGGER.error(ex);
+            LOGGER.error(ex.getMessage());
         }
         return strIpServer;
     }
 
     /**
      * Get action type from method
+     *
      * @param method
      * @return
      */
     private String getActionTypeByMethod(String method) {
         switch (method) {
-            case "GET": return "VIEW";
-            case "POST": return "INSERT";
-            case "PUT": return "EDIT";
-            case "DELETE": return "DELETE";
-            default: return "";
+            case "GET":
+                return "VIEW";
+            case "POST":
+                return "INSERT";
+            case "PUT":
+                return "EDIT";
+            case "DELETE":
+                return "DELETE";
+            default:
+                return "";
         }
     }
 
